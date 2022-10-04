@@ -1,0 +1,76 @@
+pipeline {
+agent {
+node {
+                     label "built-in"
+					 customWorkspace "/mnt/projects"
+
+
+}
+}
+
+stages {
+
+stage ('Cloning game-of-life') {
+steps {
+
+        //given 777 permissions manually first to /mnt in master & Host machines//
+		sh "sudo rm -rf *"
+        sh "sudo yum install git -y"
+		
+		sh "sudo git clone https://github.com/nupur-londhe/game-of-life-nup.git"
+        sh "sudo chmod -R 777 /mnt"
+
+}
+}
+
+stage ('Building the source code') {
+steps {
+dir('/mnt/projects/game-of-life-nup') {
+
+            sh "mvn install"
+}
+}                                                
+}
+
+stage ('Moving war to dev-A'){
+steps{
+
+         sh "ansible dev[0] -b -m copy -a 'src=/mnt/projects/game-of-life-nup/gameoflife-web/target/gameoflife.war dest=/mnt/docker-files'"
+
+		 sh "ansible dev[0] -b -m copy -a 'src=/mnt/Dockerfile dest=/mnt/docker-files'"
+
+}
+}
+
+stage ('containerizing war application') {
+
+agent {
+node {
+             label "10.10.1.39-dev-A"
+			 customWorkspace "/mnt"
+
+}
+}
+
+steps {
+ 
+			sh "sudo chmod -R 777 docker-files"
+           
+dir('/mnt/docker-files'){
+
+          sh "sudo yum install docker -y"
+
+          sh "sudo systemctl start docker"
+			 
+		  sh "sudo docker build -t tommy:2.0 ."
+		  
+		  
+		  sh "sudo docker run -itdp 8080:8080 tommy:2.0"
+		  sh "sudo docker run -itdp 9090:8080 tommy:2.0"
+
+}
+}
+
+}
+}
+}
